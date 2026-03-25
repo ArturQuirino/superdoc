@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "dev": "bun run src/index.ts",
+    "dev:http": "bun run src/http.ts",
     "build": "bun build src/index.ts --outdir dist --target node --format esm",
     "test": "NODE_ENV=test bun test",
     "typecheck": "tsc --noEmit"

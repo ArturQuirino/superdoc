@@ -14,11 +14,16 @@ import { resolve, basename, dirname, extname, join } from 'node:path';
 // ---------------------------------------------------------------------------
 
 function generateCopyPath(sourcePath: string): string {
+  const { randomBytes } = require('node:crypto');
   const dir = dirname(sourcePath);
   const ext = extname(sourcePath);
   const stem = basename(sourcePath, ext);
-  return join(dir, `${stem}-edited${ext}`);
+  const suffix = randomBytes(2).toString('hex');
+  return join(dir, `${stem}-edited-${suffix}${ext}`);
 }
+
+/** Match pattern for copy paths: <stem>-edited-<4hex><ext> */
+const COPY_PATH_RE = /^(.+)-edited-[0-9a-f]{4}(\.[^.]+)$/;
 
 function generateSessionId(filePath: string): string {
   const { randomBytes } = require('node:crypto');
@@ -38,9 +43,9 @@ function generateSessionId(filePath: string): string {
 // ---------------------------------------------------------------------------
 
 describe('generateCopyPath', () => {
-  test('produces <stem>-edited<ext> in the same directory', () => {
+  test('produces <stem>-edited-<hex><ext> in the same directory', () => {
     const result = generateCopyPath('/home/user/docs/report.docx');
-    expect(result).toBe('/home/user/docs/report-edited.docx');
+    expect(result).toMatch(/\/home\/user\/docs\/report-edited-[0-9a-f]{4}\.docx$/);
   });
 
   test('preserves directory path', () => {
@@ -55,17 +60,17 @@ describe('generateCopyPath', () => {
 
   test('handles paths with spaces', () => {
     const result = generateCopyPath('/my docs/my file.docx');
-    expect(result).toBe('/my docs/my file-edited.docx');
+    expect(result).toMatch(/\/my docs\/my file-edited-[0-9a-f]{4}\.docx$/);
   });
 
   test('handles files with multiple dots', () => {
     const result = generateCopyPath('/docs/my.report.v2.docx');
-    expect(result).toBe('/docs/my.report.v2-edited.docx');
+    expect(result).toMatch(/\/docs\/my\.report\.v2-edited-[0-9a-f]{4}\.docx$/);
   });
 
   test('handles files in root directory', () => {
     const result = generateCopyPath('/file.docx');
-    expect(result).toBe('/file-edited.docx');
+    expect(result).toMatch(/\/file-edited-[0-9a-f]{4}\.docx$/);
   });
 });
 

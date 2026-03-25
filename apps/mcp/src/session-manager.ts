@@ -10,17 +10,12 @@ export type OpenMode = 'copy' | 'edit';
 
 export interface Session {
   id: string;
-  /** Original file that was opened (read from). */
   sourcePath: string;
-  /** Where save writes by default. */
   savePath: string;
-  /** Whether this is a new (blank) document. */
   isNew: boolean;
   editor: Editor;
   api: DocumentApi;
   openedAt: number;
-  /** @deprecated Use sourcePath. Kept for v1 compat. */
-  get filePath(): string;
 }
 
 export class SessionManager {
@@ -54,7 +49,6 @@ export class SessionManager {
     const api = createDocumentApi(adapters);
     const id = generateSessionId(absolutePath);
 
-    // New files always save in-place. Existing files respect mode.
     let savePath: string;
     if (opts?.outputPath) {
       savePath = resolve(opts.outputPath);
@@ -66,39 +60,23 @@ export class SessionManager {
       savePath = absolutePath;
     }
 
-    const session: Session = {
-      id,
-      sourcePath: absolutePath,
-      savePath,
-      isNew,
-      editor,
-      api,
-      openedAt: Date.now(),
-      get filePath() {
-        return this.sourcePath;
-      },
-    };
-
+    const session: Session = { id, sourcePath: absolutePath, savePath, isNew, editor, api, openedAt: Date.now() };
     this.sessions.set(id, session);
     return session;
   }
 
   get(sessionId: string): Session {
     const session = this.sessions.get(sessionId);
-    if (!session) {
-      throw new Error(`No open session "${sessionId}". Call superdoc_read or open a document first.`);
-    }
+    if (!session) throw new Error(`No open session "${sessionId}".`);
     return session;
   }
 
   async save(sessionId: string, outputPath?: string): Promise<{ path: string; byteLength: number }> {
     const session = this.get(sessionId);
     const targetPath = outputPath ? resolve(outputPath) : session.savePath;
-
     const exported = await session.editor.exportDocument();
     const bytes = toUint8Array(exported);
     await writeFile(targetPath, bytes);
-
     return { path: targetPath, byteLength: bytes.byteLength };
   }
 
@@ -109,17 +87,13 @@ export class SessionManager {
     this.sessions.delete(sessionId);
   }
 
+  get size(): number {
+    return this.sessions.size;
+  }
+
   async closeAll(): Promise<void> {
     for (const session of this.sessions.values()) session.editor.destroy();
     this.sessions.clear();
-  }
-
-  list(): Array<{ id: string; filePath: string; openedAt: number }> {
-    return Array.from(this.sessions.values()).map((s) => ({
-      id: s.id,
-      filePath: s.sourcePath,
-      openedAt: s.openedAt,
-    }));
   }
 }
 
@@ -146,8 +120,6 @@ function generateSessionId(filePath: string): string {
 function toUint8Array(data: unknown): Uint8Array {
   if (data instanceof Uint8Array) return data;
   if (data instanceof ArrayBuffer) return new Uint8Array(data);
-  if (ArrayBuffer.isView(data)) {
-    return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
-  }
+  if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
   throw new Error('Exported document data is not binary.');
 }
