@@ -1,33 +1,48 @@
 import { access, readFile, writeFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
-import { resolve, basename } from 'node:path';
+import { resolve, basename, dirname, extname, join } from 'node:path';
 import { Editor } from 'superdoc/super-editor';
 import { getDocumentApiAdapters } from '@superdoc/super-editor/document-api-adapters';
 import { createDocumentApi, type DocumentApi } from '@superdoc/document-api';
 import { BLANK_DOCX_BASE64 } from '@superdoc/super-editor/blank-docx';
 
+export type OpenMode = 'copy' | 'edit';
+
 export interface Session {
   id: string;
-  filePath: string;
+  /** Original file that was opened (read from). */
+  sourcePath: string;
+  /** Where save writes by default. */
+  savePath: string;
+  /** Whether this is a new (blank) document. */
+  isNew: boolean;
   editor: Editor;
   api: DocumentApi;
   openedAt: number;
+  /** @deprecated Use sourcePath. Kept for v1 compat. */
+  get filePath(): string;
 }
 
 export class SessionManager {
   private sessions = new Map<string, Session>();
 
-  async open(filePath: string): Promise<Session> {
+  async open(filePath: string, opts?: { mode?: OpenMode; outputPath?: string }): Promise<Session> {
     const absolutePath = resolve(filePath);
+    const mode = opts?.mode ?? 'copy';
 
     let bytes: Buffer;
+    let isNew = false;
 
     try {
       await access(absolutePath);
       bytes = await readFile(absolutePath);
-    } catch {
-      // File doesn't exist — create a blank document from the built-in template
-      bytes = Buffer.from(BLANK_DOCX_BASE64, 'base64');
+    } catch (e: any) {
+      if (e?.code === 'ENOENT') {
+        bytes = Buffer.from(BLANK_DOCX_BASE64, 'base64');
+        isNew = true;
+      } else {
+        throw e;
+      }
     }
 
     const editor = await Editor.open(bytes, {
@@ -37,15 +52,31 @@ export class SessionManager {
 
     const adapters = getDocumentApiAdapters(editor);
     const api = createDocumentApi(adapters);
-
     const id = generateSessionId(absolutePath);
+
+    // New files always save in-place. Existing files respect mode.
+    let savePath: string;
+    if (opts?.outputPath) {
+      savePath = resolve(opts.outputPath);
+    } else if (isNew) {
+      savePath = absolutePath;
+    } else if (mode === 'copy') {
+      savePath = generateCopyPath(absolutePath);
+    } else {
+      savePath = absolutePath;
+    }
 
     const session: Session = {
       id,
-      filePath: absolutePath,
+      sourcePath: absolutePath,
+      savePath,
+      isNew,
       editor,
       api,
       openedAt: Date.now(),
+      get filePath() {
+        return this.sourcePath;
+      },
     };
 
     this.sessions.set(id, session);
@@ -55,18 +86,17 @@ export class SessionManager {
   get(sessionId: string): Session {
     const session = this.sessions.get(sessionId);
     if (!session) {
-      throw new Error(`No open session with id "${sessionId}". Use superdoc_open first.`);
+      throw new Error(`No open session "${sessionId}". Call superdoc_read or open a document first.`);
     }
     return session;
   }
 
   async save(sessionId: string, outputPath?: string): Promise<{ path: string; byteLength: number }> {
     const session = this.get(sessionId);
-    const targetPath = outputPath ? resolve(outputPath) : session.filePath;
+    const targetPath = outputPath ? resolve(outputPath) : session.savePath;
 
     const exported = await session.editor.exportDocument();
     const bytes = toUint8Array(exported);
-
     await writeFile(targetPath, bytes);
 
     return { path: targetPath, byteLength: bytes.byteLength };
@@ -75,25 +105,30 @@ export class SessionManager {
   async close(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) return;
-
     session.editor.destroy();
     this.sessions.delete(sessionId);
   }
 
   async closeAll(): Promise<void> {
-    for (const session of this.sessions.values()) {
-      session.editor.destroy();
-    }
+    for (const session of this.sessions.values()) session.editor.destroy();
     this.sessions.clear();
   }
 
   list(): Array<{ id: string; filePath: string; openedAt: number }> {
     return Array.from(this.sessions.values()).map((s) => ({
       id: s.id,
-      filePath: s.filePath,
+      filePath: s.sourcePath,
       openedAt: s.openedAt,
     }));
   }
+}
+
+function generateCopyPath(sourcePath: string): string {
+  const dir = dirname(sourcePath);
+  const ext = extname(sourcePath);
+  const stem = basename(sourcePath, ext);
+  const suffix = randomBytes(2).toString('hex');
+  return join(dir, `${stem}-edited-${suffix}${ext}`);
 }
 
 function generateSessionId(filePath: string): string {
