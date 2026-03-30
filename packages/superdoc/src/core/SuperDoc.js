@@ -1160,7 +1160,6 @@ export class SuperDoc extends EventEmitter {
 
     this.toolbar = new SuperToolbar(config);
 
-    this.toolbar.on('superdoc-command', this.onToolbarCommand.bind(this));
     this.toolbar.on('exception', this.config.onException);
     this.once('editorCreate', () => this.toolbar.updateToolbarState());
   }
@@ -1233,20 +1232,6 @@ export class SuperDoc extends EventEmitter {
         editor.setOptions({ disableContextMenu: nextValue });
       }
     });
-  }
-
-  /**
-   * Triggered when a toolbar command is executed
-   * @param {Object} param0
-   * @param {Object} param0.item The toolbar item that was clicked
-   * @param {string} param0.argument The argument passed to the command
-   */
-  onToolbarCommand({ item, argument }) {
-    if (item.command === 'setDocumentMode') {
-      this.setDocumentMode(argument);
-    } else if (item.command === 'setZoom') {
-      this.superdocStore.activeZoom = argument;
-    }
   }
 
   /**
@@ -1327,7 +1312,6 @@ export class SuperDoc extends EventEmitter {
     });
 
     if (this.toolbar) {
-      this.toolbar.documentMode = 'editing';
       this.toolbar.updateToolbarState();
     }
   }
@@ -1348,7 +1332,6 @@ export class SuperDoc extends EventEmitter {
     });
 
     if (this.toolbar) {
-      this.toolbar.documentMode = 'suggesting';
       this.toolbar.updateToolbarState();
     }
   }
@@ -1378,7 +1361,6 @@ export class SuperDoc extends EventEmitter {
     });
 
     if (this.toolbar) {
-      this.toolbar.documentMode = 'viewing';
       this.toolbar.updateToolbarState();
     }
   }
@@ -1456,11 +1438,6 @@ export class SuperDoc extends EventEmitter {
     // to all PresentationEditor instances via PresentationEditor.setGlobalZoom().
     if (this.superdocStore) {
       this.superdocStore.activeZoom = percent;
-    }
-
-    // Update toolbar UI so the dropdown label reflects the new zoom level
-    if (this.toolbar && typeof this.toolbar.setZoom === 'function') {
-      this.toolbar.setZoom(percent);
     }
 
     this.emit('zoomChange', { zoom: percent });
@@ -1710,6 +1687,9 @@ export class SuperDoc extends EventEmitter {
     if (this.#surfaceManager) {
       this.#surfaceManager.destroy();
     }
+
+    this.toolbar?.destroy();
+
     // Unmount the app FIRST so editors are destroyed — this triggers each
     // extension's onDestroy() which cancels debounced Y.js writes and
     // unobserves Y.js maps. Only then is it safe to destroy the ydoc/provider.
