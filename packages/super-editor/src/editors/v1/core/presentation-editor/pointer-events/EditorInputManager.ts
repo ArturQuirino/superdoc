@@ -39,7 +39,7 @@ import {
 } from '../tables/TableSelectionUtilities.js';
 import { debugLog } from '../selection/SelectionDebug.js';
 import { DOM_CLASS_NAMES, buildAnnotationSelector, DRAGGABLE_SELECTOR } from '@superdoc/dom-contract';
-import { isSemanticFootnoteBlockId } from '../semantic-flow-constants.js';
+import { isFootnoteLayoutBlockId } from '../semantic-flow-constants.js';
 import { CommentsPluginKey } from '@extensions/comment/comments-plugin.js';
 
 // =============================================================================
@@ -69,15 +69,6 @@ type CommentThreadHit = {
   isAmbiguous: boolean;
   threadId: string | null;
 };
-
-/**
- * Block IDs for footnote content use prefix "footnote-{id}-" (see FootnotesBuilder).
- * Semantic footnote blocks use the {@link isSemanticFootnoteBlockId} helper from
- * shared constants — it matches both heading and body footnote block IDs.
- */
-function isFootnoteBlockId(blockId: string): boolean {
-  return typeof blockId === 'string' && (blockId.startsWith('footnote-') || isSemanticFootnoteBlockId(blockId));
-}
 
 function getCommentHighlightThreadIds(target: EventTarget | null): string[] {
   if (!(target instanceof Element)) {
@@ -1062,7 +1053,7 @@ export class EditorInputManager {
     // Disallow cursor placement in footnote lines: keep current selection and only focus editor.
     const fragmentEl = target?.closest?.('[data-block-id]') as HTMLElement | null;
     const clickedBlockId = fragmentEl?.getAttribute?.('data-block-id') ?? '';
-    if (isFootnoteBlockId(clickedBlockId)) {
+    if (isFootnoteLayoutBlockId(clickedBlockId)) {
       if (!isDraggableAnnotation) event.preventDefault();
       this.#focusEditor();
       return;
@@ -1170,7 +1161,7 @@ export class EditorInputManager {
 
     // Disallow cursor placement in footnote lines (footnote content is read-only in the layout).
     // Keep the current selection unchanged instead of moving caret to document start.
-    if (isFootnoteBlockId(rawHit.blockId)) {
+    if (isFootnoteLayoutBlockId(rawHit.blockId)) {
       this.#focusEditor();
       return;
     }
@@ -1906,7 +1897,7 @@ export class EditorInputManager {
     if (!rawHit) return;
 
     // Don't extend selection into footnote lines
-    if (isFootnoteBlockId(rawHit.blockId)) return;
+    if (isFootnoteLayoutBlockId(rawHit.blockId)) return;
 
     const editor = this.#deps.getEditor();
     const doc = editor.state?.doc;

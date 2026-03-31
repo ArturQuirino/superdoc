@@ -12,3 +12,14 @@ export const SEMANTIC_FOOTNOTE_BLOCK_ID_PREFIX = '__sd_semantic_footnote';
 export function isSemanticFootnoteBlockId(blockId: string): boolean {
   return typeof blockId === 'string' && blockId.startsWith(SEMANTIC_FOOTNOTE_BLOCK_ID_PREFIX);
 }
+
+/**
+ * True when a layout / painted `data-block-id` belongs to the footnote band
+ * (DOCX `footnote-*` fragments from FootnotesBuilder, semantic-flow `__sd_semantic_footnote*`
+ * bodies — heading included via that prefix — and separators).
+ * Use for hit-testing, DomPositionIndex (`isFootnotePaintedBlockHost`), and layout fragment scans.
+ */
+export function isFootnoteLayoutBlockId(blockId: string | null | undefined): boolean {
+  if (typeof blockId !== 'string' || blockId.length === 0) return false;
+  return blockId.startsWith('footnote-') || isSemanticFootnoteBlockId(blockId);
+}

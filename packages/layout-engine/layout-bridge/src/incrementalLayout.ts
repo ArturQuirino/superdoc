@@ -1742,6 +1742,8 @@ export async function incrementalLayout(
           footnoteReservedByPageIndex,
           headerContentHeights,
           footerContentHeights,
+          headerContentHeightsByRId,
+          footerContentHeightsByRId,
           remeasureParagraph: (block: FlowBlock, maxWidth: number, firstLineIndent?: number) =>
             remeasureParagraph(block as ParagraphBlock, maxWidth, firstLineIndent),
         });

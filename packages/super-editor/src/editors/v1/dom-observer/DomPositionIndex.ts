@@ -1,6 +1,19 @@
 import { DOM_CLASS_NAMES } from '@superdoc/dom-contract';
 import { sortedIndexBy } from 'lodash';
+import { isFootnoteLayoutBlockId } from '../core/presentation-editor/semantic-flow-constants.js';
 import { debugLog, getSelectionDebugConfig } from '../core/presentation-editor/selection/SelectionDebug.js';
+
+/**
+ * True when the PM-range element sits under a painted footnote/separator fragment.
+ * Those nodes must not participate in body caret/DOM-index resolution — they use
+ * different PM ranges and resolving "closest" gaps to them jumps the caret/scroll
+ * to the footnote band (notably with footnotes + multi-pass layout).
+ */
+export function isFootnotePaintedBlockHost(node: HTMLElement): boolean {
+  const host = node.closest('[data-block-id]');
+  if (!(host instanceof HTMLElement)) return false;
+  return isFootnoteLayoutBlockId(host.dataset.blockId);
+}
 
 /**
  * Represents a single entry in the DOM position index.
@@ -99,6 +112,7 @@ export class DomPositionIndex {
     for (const node of pmNodes) {
       if (node.classList.contains(DOM_CLASS_NAMES.INLINE_SDT_WRAPPER)) continue;
       if (node.closest('.superdoc-page-header, .superdoc-page-footer')) continue;
+      if (isFootnotePaintedBlockHost(node)) continue;
       if (leafOnly && nonLeaf.has(node)) continue;
 
       const pmStart = Number(node.dataset.pmStart ?? 'NaN');

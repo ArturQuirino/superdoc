@@ -20,7 +20,7 @@ import type { Mapping } from 'prosemirror-transform';
 import { Editor } from '../Editor.js';
 import { EventEmitter } from '../EventEmitter.js';
 import { EpochPositionMapper } from './layout/EpochPositionMapper.js';
-import { DomPositionIndex } from '../../dom-observer/DomPositionIndex.js';
+import { DomPositionIndex, isFootnotePaintedBlockHost } from '../../dom-observer/DomPositionIndex.js';
 import { DomPositionIndexObserverManager } from '../../dom-observer/DomPositionIndexObserverManager.js';
 import {
   computeDomCaretPageLocal as computeDomCaretPageLocalFromDom,
@@ -118,6 +118,7 @@ import { isHeaderFooterPartId } from '../parts/adapters/header-footer-part-descr
 import type { PartChangedEvent } from '../parts/types.js';
 import { isInRegisteredSurface } from './utils/uiSurfaceRegistry.js';
 import { buildSemanticFootnoteBlocks } from './semantic-flow-footnotes.js';
+import { isFootnoteLayoutBlockId } from './semantic-flow-constants.js';
 
 type ThreadAnchorScrollPlan = {
   achievedClientY: number;
@@ -2433,6 +2434,9 @@ export class PresentationEditor extends EventEmitter {
       for (let idx = 0; idx < layout.pages.length; idx++) {
         const page = layout.pages[idx];
         for (const fragment of page.fragments) {
+          if (isFootnoteLayoutBlockId((fragment as { blockId?: string }).blockId)) {
+            continue;
+          }
           const frag = fragment as { pmStart?: number; pmEnd?: number };
           if (frag.pmStart != null && frag.pmEnd != null && clampedPos >= frag.pmStart && clampedPos <= frag.pmEnd) {
             pageIndex = idx;
@@ -2575,6 +2579,7 @@ export class PresentationEditor extends EventEmitter {
       // Skip header/footer fragments — their PM positions come from a separate
       // document and can overlap with body positions, causing incorrect matches.
       if (htmlEl.closest('.superdoc-page-header, .superdoc-page-footer')) continue;
+      if (isFootnotePaintedBlockHost(htmlEl)) continue;
 
       const start = Number(htmlEl.dataset.pmStart);
       const end = Number(htmlEl.dataset.pmEnd);
@@ -2631,6 +2636,9 @@ export class PresentationEditor extends EventEmitter {
     for (let idx = 0; idx < layout.pages.length; idx++) {
       const page = layout.pages[idx];
       for (const fragment of page.fragments) {
+        if (isFootnoteLayoutBlockId((fragment as { blockId?: string }).blockId)) {
+          continue;
+        }
         const frag = fragment as { pmStart?: number; pmEnd?: number };
         if (frag.pmStart != null && frag.pmEnd != null && clampedPos >= frag.pmStart && clampedPos <= frag.pmEnd) {
           pageIndex = idx;
@@ -6558,6 +6566,9 @@ export class PresentationEditor extends EventEmitter {
     for (let pageIdx = 0; pageIdx < layout.pages.length; pageIdx++) {
       const page = layout.pages[pageIdx];
       for (const fragment of page.fragments) {
+        if (isFootnoteLayoutBlockId((fragment as { blockId?: string }).blockId)) {
+          continue;
+        }
         const frag = fragment as { pmStart?: number; pmEnd?: number };
         if (frag.pmStart != null && frag.pmEnd != null) {
           if (pos >= frag.pmStart && pos <= frag.pmEnd) {

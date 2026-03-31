@@ -3,6 +3,7 @@ import type { FlowBlock } from '@superdoc/contracts';
 
 import { buildSemanticFootnoteBlocks } from '../semantic-flow-footnotes.js';
 import {
+  isFootnoteLayoutBlockId,
   isSemanticFootnoteBlockId,
   SEMANTIC_FOOTNOTES_HEADING_BLOCK_ID,
   SEMANTIC_FOOTNOTE_BLOCK_ID_PREFIX,
@@ -63,5 +64,14 @@ describe('semantic-flow-footnotes', () => {
     expect(isSemanticFootnoteBlockId(SEMANTIC_FOOTNOTES_HEADING_BLOCK_ID)).toBe(true);
     expect(isSemanticFootnoteBlockId(`${SEMANTIC_FOOTNOTE_BLOCK_ID_PREFIX}-1-0-0-fn-1`)).toBe(true);
     expect(isSemanticFootnoteBlockId('footnote-1-0')).toBe(false);
+  });
+
+  it('isFootnoteLayoutBlockId matches DOCX and semantic painted footnote block ids', () => {
+    expect(isFootnoteLayoutBlockId('footnote-1-0-paragraph')).toBe(true);
+    expect(isFootnoteLayoutBlockId(SEMANTIC_FOOTNOTES_HEADING_BLOCK_ID)).toBe(true);
+    expect(isFootnoteLayoutBlockId(`${SEMANTIC_FOOTNOTE_BLOCK_ID_PREFIX}-1-0-0-fn-1`)).toBe(true);
+    expect(isFootnoteLayoutBlockId('body-1')).toBe(false);
+    expect(isFootnoteLayoutBlockId(null)).toBe(false);
+    expect(isFootnoteLayoutBlockId('')).toBe(false);
   });
 });

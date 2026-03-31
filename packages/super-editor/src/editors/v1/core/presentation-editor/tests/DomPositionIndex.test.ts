@@ -65,6 +65,41 @@ describe('DomPositionIndex', () => {
     expect(index.findElementAtPosition(1)?.textContent).toBe('body');
   });
 
+  it('skips footnote painted fragments when building the index', () => {
+    const container = document.createElement('div');
+    const page = document.createElement('div');
+    page.className = 'superdoc-page';
+    page.dataset.pageIndex = '0';
+
+    const bodyLine = document.createElement('div');
+    bodyLine.className = 'superdoc-line';
+    const bodySpan = document.createElement('span');
+    bodySpan.setAttribute('data-pm-start', '1');
+    bodySpan.setAttribute('data-pm-end', '5');
+    bodySpan.textContent = 'body';
+    bodyLine.appendChild(bodySpan);
+    page.appendChild(bodyLine);
+
+    const fnBlock = document.createElement('div');
+    fnBlock.className = 'superdoc-line';
+    fnBlock.setAttribute('data-block-id', 'footnote-1-0-paragraph');
+    const fnSpan = document.createElement('span');
+    fnSpan.setAttribute('data-pm-start', '100');
+    fnSpan.setAttribute('data-pm-end', '120');
+    fnSpan.textContent = 'fn text';
+    fnBlock.appendChild(fnSpan);
+    page.appendChild(fnBlock);
+
+    container.appendChild(page);
+
+    const index = new DomPositionIndex();
+    index.rebuild(container);
+
+    expect(index.size).toBe(1);
+    expect(index.findElementAtPosition(3)?.textContent).toBe('body');
+    expect(index.findEntryClosestToPosition(50)?.el.textContent).toBe('body');
+  });
+
   it('skips footer-only content when building the index', () => {
     const container = document.createElement('div');
     container.innerHTML = `

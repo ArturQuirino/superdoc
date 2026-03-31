@@ -8,7 +8,7 @@
  * @module dom-observer
  */
 
-export { DomPositionIndex, type DomPositionIndexEntry } from './DomPositionIndex.js';
+export { DomPositionIndex, type DomPositionIndexEntry, isFootnotePaintedBlockHost } from './DomPositionIndex.js';
 export { DomPositionIndexObserverManager } from './DomPositionIndexObserverManager.js';
 export {
   type LayoutRect,

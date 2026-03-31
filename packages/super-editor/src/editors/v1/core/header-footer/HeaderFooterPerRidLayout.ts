@@ -133,23 +133,47 @@ function resolveTableMinWidth(spec: TableWidthSpec | undefined, contentWidth: nu
   return spec.value; // grid or px: already in pixels
 }
 
+type SectionVariantRefs = {
+  default?: string;
+  first?: string;
+  even?: string;
+  odd?: string;
+};
+
 /**
- * Resolve the rId for each section, inheriting from previous sections when not explicitly set.
- * This follows Word's OOXML inheritance model: if a section has no ref for a given kind,
- * it inherits the previous section's ref.
+ * Resolve every effective header/footer rId for each section, inheriting from
+ * previous sections when a variant is not explicitly set.
+ *
+ * Word resolves header/footer references per variant, not just via the default
+ * slot. A section may render a distinct first-page header, or inherit a previous
+ * section's first/even/odd header while keeping its own default header. The
+ * per-rId layout cache must therefore include every effective ref a section can
+ * render, otherwise the painted header/footer can be blank even though the editor
+ * host for that ref contains content.
  */
-function resolveRIdPerSection(sectionMetadata: SectionMetadata[], kind: 'header' | 'footer'): Map<number, string> {
-  const result = new Map<number, string>();
-  let inherited: string | undefined;
+function resolveEffectiveRIdsPerSection(
+  sectionMetadata: SectionMetadata[],
+  kind: 'header' | 'footer',
+): Map<number, Set<string>> {
+  const result = new Map<number, Set<string>>();
+  const inherited: SectionVariantRefs = {};
 
   for (const section of sectionMetadata) {
-    const refs = kind === 'header' ? section.headerRefs : section.footerRefs;
-    const rId = refs?.default;
-    if (rId) {
-      inherited = rId;
-    }
-    if (inherited) {
-      result.set(section.sectionIndex, inherited);
+    const refs = (kind === 'header' ? section.headerRefs : section.footerRefs) ?? {};
+
+    if (refs.default) inherited.default = refs.default;
+    if (refs.first) inherited.first = refs.first;
+    if (refs.even) inherited.even = refs.even;
+    if (refs.odd) inherited.odd = refs.odd;
+
+    const effectiveRefs = new Set<string>();
+    if (inherited.default) effectiveRefs.add(inherited.default);
+    if (inherited.first) effectiveRefs.add(inherited.first);
+    if (inherited.even) effectiveRefs.add(inherited.even);
+    if (inherited.odd) effectiveRefs.add(inherited.odd);
+
+    if (effectiveRefs.size > 0) {
+      result.set(section.sectionIndex, effectiveRefs);
     }
   }
 
@@ -330,7 +354,7 @@ async function layoutWithPerSectionConstraints(
 ): Promise<void> {
   if (!blocksByRId) return;
 
-  const rIdPerSection = resolveRIdPerSection(sectionMetadata, kind);
+  const effectiveRIdsPerSection = resolveEffectiveRIdsPerSection(sectionMetadata, kind);
 
   // Extract table width specs per rId (SD-1837).
   // Word allows tables in headers/footers to extend beyond content margins.
@@ -352,32 +376,36 @@ async function layoutWithPerSectionConstraints(
   >();
 
   for (const section of sectionMetadata) {
-    const rId = rIdPerSection.get(section.sectionIndex);
-    if (!rId || !blocksByRId.has(rId)) continue;
+    const sectionRIds = effectiveRIdsPerSection.get(section.sectionIndex);
+    if (!sectionRIds || sectionRIds.size === 0) continue;
 
-    // Resolve the minimum width needed for tables in this section.
-    // For pct tables, this depends on the section's content width.
-    const contentWidth = buildSectionContentWidth(section, fallbackConstraints);
-    const tableWidthSpec = tableWidthSpecByRId.get(rId);
-    const tableMinWidth = resolveTableMinWidth(tableWidthSpec, contentWidth);
-    const sectionConstraints = buildConstraintsForSection(section, fallbackConstraints, tableMinWidth || undefined);
-    const effectiveWidth = sectionConstraints.width;
-    // Include vertical geometry in the key so sections with different page heights,
-    // vertical margins, or header distance get separate layouts (page-relative anchors
-    // and header band origin resolve differently).
-    const groupKey = `${rId}::w${effectiveWidth}::ph${sectionConstraints.pageHeight ?? ''}::mt${sectionConstraints.margins?.top ?? ''}::mb${sectionConstraints.margins?.bottom ?? ''}::mh${sectionConstraints.margins?.header ?? ''}`;
+    for (const rId of sectionRIds) {
+      if (!blocksByRId.has(rId)) continue;
 
-    let group = groups.get(groupKey);
-    if (!group) {
-      group = {
-        sectionConstraints,
-        sectionIndices: [],
-        rId,
-        effectiveWidth,
-      };
-      groups.set(groupKey, group);
+      // Resolve the minimum width needed for tables in this section.
+      // For pct tables, this depends on the section's content width.
+      const contentWidth = buildSectionContentWidth(section, fallbackConstraints);
+      const tableWidthSpec = tableWidthSpecByRId.get(rId);
+      const tableMinWidth = resolveTableMinWidth(tableWidthSpec, contentWidth);
+      const sectionConstraints = buildConstraintsForSection(section, fallbackConstraints, tableMinWidth || undefined);
+      const effectiveWidth = sectionConstraints.width;
+      // Include vertical geometry in the key so sections with different page heights,
+      // vertical margins, or header distance get separate layouts (page-relative anchors
+      // and header band origin resolve differently).
+      const groupKey = `${rId}::w${effectiveWidth}::ph${sectionConstraints.pageHeight ?? ''}::mt${sectionConstraints.margins?.top ?? ''}::mb${sectionConstraints.margins?.bottom ?? ''}::mh${sectionConstraints.margins?.header ?? ''}`;
+
+      let group = groups.get(groupKey);
+      if (!group) {
+        group = {
+          sectionConstraints,
+          sectionIndices: [],
+          rId,
+          effectiveWidth,
+        };
+        groups.set(groupKey, group);
+      }
+      group.sectionIndices.push(section.sectionIndex);
     }
-    group.sectionIndices.push(section.sectionIndex);
   }
 
   // Measure and layout each unique (rId, effectiveWidth) group
