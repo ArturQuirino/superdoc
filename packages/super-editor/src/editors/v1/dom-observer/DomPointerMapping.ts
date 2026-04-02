@@ -189,6 +189,14 @@ export function clickToPositionDom(domContainer: HTMLElement, clientX: number, c
     return resolveLineAtX(hitChainLine, clientX);
   }
 
+  if (fragmentEl.classList.contains(CLASS.tableFragment)) {
+    const scopedContainer = findScopedLineContainer(hitChain, fragmentEl);
+    if (scopedContainer) {
+      log('Resolving table click from scoped line container');
+      return resolveLineInContainer(scopedContainer, clientX, clientY);
+    }
+  }
+
   // For table fragments without a direct line hit, defer to geometry
   // (hitTestTableFragment resolves the correct cell by column).
   if (fragmentEl.classList.contains(CLASS.tableFragment)) {
@@ -269,6 +277,18 @@ function resolveFragment(fragmentEl: HTMLElement, viewX: number, viewY: number):
   const lineEls = Array.from(fragmentEl.querySelectorAll(`.${CLASS.line}`)) as HTMLElement[];
   if (lineEls.length === 0) {
     log('No lines in fragment');
+    return null;
+  }
+
+  const lineEl = findLineAtY(lineEls, viewY);
+  if (!lineEl) return null;
+
+  return resolveLineAtX(lineEl, viewX);
+}
+
+function resolveLineInContainer(containerEl: HTMLElement, viewX: number, viewY: number): number | null {
+  const lineEls = Array.from(containerEl.querySelectorAll(`.${CLASS.line}`)) as HTMLElement[];
+  if (lineEls.length === 0) {
     return null;
   }
 
@@ -364,12 +384,21 @@ function resolvePositionInLine(
 function findLineAtY(lineEls: HTMLElement[], viewY: number): HTMLElement | null {
   if (lineEls.length === 0) return null;
 
+  let nearest: HTMLElement = lineEls[0];
+  let minDistance = Infinity;
+
   for (const lineEl of lineEls) {
     const r = lineEl.getBoundingClientRect();
     if (viewY >= r.top && viewY <= r.bottom) return lineEl;
+
+    const distance = viewY < r.top ? r.top - viewY : Math.max(0, viewY - r.bottom);
+    if (distance < minDistance) {
+      minDistance = distance;
+      nearest = lineEl;
+    }
   }
 
-  return lineEls[lineEls.length - 1];
+  return nearest;
 }
 
 /**
@@ -395,6 +424,19 @@ function findSpanAtX(spanEls: HTMLElement[], viewX: number): HTMLElement | null 
   }
 
   return nearest;
+}
+
+function findScopedLineContainer(hitChain: Element[], fragmentEl: HTMLElement): HTMLElement | null {
+  for (const el of hitChain) {
+    if (!(el instanceof HTMLElement)) continue;
+    if (el === fragmentEl) break;
+    if (!fragmentEl.contains(el)) continue;
+    if (el.querySelector(`.${CLASS.line}`)) {
+      return el;
+    }
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------
