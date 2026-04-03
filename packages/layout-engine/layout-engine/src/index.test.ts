@@ -16,6 +16,7 @@ import type {
   PageBreakBlock,
   TableBlock,
   TableMeasure,
+  SectionMetadata,
 } from '@superdoc/contracts';
 import { layoutDocument, layoutHeaderFooter, type LayoutOptions } from './index.js';
 
@@ -759,6 +760,70 @@ describe('layoutDocument', () => {
     const fragment = layout.pages[0].fragments[0] as ParaFragment;
     expect(fragment.pmStart).toBe(1);
     expect(fragment.pmEnd).toBe(12);
+  });
+
+  it('inflates top margin using transitive inherited first-header rId (multi-hop section metadata)', () => {
+    const m = { top: 72, bottom: 72, left: 72, right: 72, header: 72, footer: 72 };
+    const sb0: FlowBlock = {
+      kind: 'sectionBreak',
+      id: 'sb-0',
+      type: 'continuous',
+      margins: m,
+      headerRefs: { default: 'd0', first: 'f0' },
+      attrs: { isFirstSection: true, sectionIndex: 0 },
+    };
+    const sb1: FlowBlock = {
+      kind: 'sectionBreak',
+      id: 'sb-1',
+      type: 'nextPage',
+      margins: m,
+      headerRefs: { default: 'd1' },
+      attrs: { sectionIndex: 1 },
+    };
+    const sb2: FlowBlock = {
+      kind: 'sectionBreak',
+      id: 'sb-2',
+      type: 'nextPage',
+      margins: m,
+      headerRefs: { default: 'd2' },
+      attrs: { sectionIndex: 2 },
+    };
+
+    const lineHeight = 40;
+    const blocks: FlowBlock[] = [
+      sb0,
+      { kind: 'paragraph', id: 'p0', runs: [] },
+      sb1,
+      { kind: 'paragraph', id: 'p1', runs: [] },
+      sb2,
+      { kind: 'paragraph', id: 'p2', runs: [] },
+    ];
+    const measures: Measure[] = [
+      { kind: 'sectionBreak' },
+      makeMeasure(Array(20).fill(lineHeight)),
+      { kind: 'sectionBreak' },
+      makeMeasure(Array(20).fill(lineHeight)),
+      { kind: 'sectionBreak' },
+      makeMeasure([lineHeight]),
+    ];
+
+    const tallFirst = 220;
+    const sectionMetadata: SectionMetadata[] = [
+      { sectionIndex: 0, titlePg: true, headerRefs: { default: 'd0', first: 'f0' } },
+      { sectionIndex: 1, titlePg: true, headerRefs: { default: 'd1' } },
+      { sectionIndex: 2, titlePg: true, headerRefs: { default: 'd2' } },
+    ];
+
+    const layout = layoutDocument(blocks, measures, {
+      pageSize: { w: 500, h: 600 },
+      margins: m,
+      sectionMetadata,
+      headerContentHeightsByRId: new Map([['f0', tallFirst]]),
+    });
+
+    const section2Page = layout.pages.find((p) => p.sectionIndex === 2);
+    expect(section2Page).toBeDefined();
+    expect(section2Page!.margins.top).toBeGreaterThanOrEqual(72 + tallFirst - 1);
   });
 
   it('applies section break margins to subsequent pages', () => {

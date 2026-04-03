@@ -122,6 +122,8 @@ export type ResolvedLayoutOptions =
       margins: ResolvedMarginsBase;
       columns?: { count: number; gap: number };
       sectionMetadata: SectionMetadata[];
+      /** Document-level w:evenAndOddHeaders — used by layout pagination for per-variant margins */
+      oddEvenHeadersFooters?: boolean;
     }
   | {
       flowMode: 'semantic';
@@ -136,6 +138,7 @@ export type ResolvedLayoutOptions =
         marginBottom: number;
       };
       sectionMetadata: SectionMetadata[];
+      oddEvenHeadersFooters?: boolean;
     };
 
 export type LayoutEngineOptions = {

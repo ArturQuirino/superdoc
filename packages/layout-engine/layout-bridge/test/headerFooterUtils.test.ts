@@ -397,8 +397,20 @@ describe('headerFooterUtils', () => {
       expect(identifier.headerIds.first).toBe('section-h-first');
       // Converter IDs should only fill in gaps
       expect(identifier.headerIds.even).toBe('converter-h-even');
+      expect(identifier.sectionHeaderIds.get(0)?.even).toBe('converter-h-even');
       expect(identifier.footerIds.default).toBe('section-f-default');
       expect(identifier.footerIds.odd).toBe('converter-f-odd');
+    });
+
+    it('fills per-section header maps from converter when section metadata omits even', () => {
+      const sectionMetadata: SectionMetadata[] = [{ sectionIndex: 0, headerRefs: { default: 'r-default' } }];
+      const identifier = buildMultiSectionIdentifier(
+        sectionMetadata,
+        { alternateHeaders: true },
+        { headerIds: { default: 'r-default', even: 'r-even' } },
+      );
+      expect(identifier.sectionHeaderIds.get(0)?.even).toBe('r-even');
+      expect(getHeaderFooterTypeForSection(2, 0, identifier, { kind: 'header', sectionPageNumber: 2 })).toBe('even');
     });
 
     it('should handle missing converterIds parameter gracefully', () => {

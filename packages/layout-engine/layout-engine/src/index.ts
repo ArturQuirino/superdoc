@@ -510,6 +510,11 @@ export type LayoutOptions = {
    * Values are the actual content heights in pixels.
    */
   footerContentHeightsByRId?: Map<string, number>;
+  /**
+   * When true, odd and even pages use different header/footer variants (w:evenAndOddHeaders).
+   * Drives per-page margin inflation to match the variant actually rendered.
+   */
+  oddEvenHeadersFooters?: boolean;
 };
 
 export type HeaderFooterConstraints = {
@@ -647,12 +652,14 @@ export function layoutDocument(blocks: FlowBlock[], measures: Measure[], options
   /**
    * Determines the header/footer variant type for a given page based on section settings.
    *
+   * @param physicalPageNumber - Document-wide page number (1-indexed), used for odd/even parity
    * @param sectionPageNumber - The page number within the current section (1-indexed)
    * @param titlePgEnabled - Whether the section has "different first page" enabled
-   * @param alternateHeaders - Whether the section has odd/even differentiation enabled
+   * @param alternateHeaders - Whether odd/even headers are enabled (document-level in OOXML)
    * @returns The variant type: 'first', 'even', 'odd', or 'default'
    */
   const getVariantTypeForPage = (
+    physicalPageNumber: number,
     sectionPageNumber: number,
     titlePgEnabled: boolean,
     alternateHeaders: boolean,
@@ -661,9 +668,9 @@ export function layoutDocument(blocks: FlowBlock[], measures: Measure[], options
     if (sectionPageNumber === 1 && titlePgEnabled) {
       return 'first';
     }
-    // Alternate headers (even/odd differentiation)
+    // Alternate headers: parity follows physical page number (matches Word / headerFooterUtils)
     if (alternateHeaders) {
-      return sectionPageNumber % 2 === 0 ? 'even' : 'odd';
+      return physicalPageNumber % 2 === 0 ? 'even' : 'odd';
     }
     return 'default';
   };
@@ -1094,6 +1101,22 @@ export function layoutDocument(blocks: FlowBlock[], measures: Measure[], options
     };
   };
   const sectionMetadataList = options.sectionMetadata ?? [];
+
+  /** Walk backward through section metadata for OOXML transitive header/footer inheritance. */
+  const findInheritedHeaderFooterRef = (
+    variant: 'default' | 'first' | 'even' | 'odd',
+    fromSectionIndex: number,
+    kind: 'header' | 'footer',
+  ): string | undefined => {
+    for (let s = fromSectionIndex - 1; s >= 0; s--) {
+      const meta = sectionMetadataList[s];
+      const refs = kind === 'header' ? meta?.headerRefs : meta?.footerRefs;
+      const id = refs?.[variant];
+      if (id) return id;
+    }
+    return undefined;
+  };
+
   const initialSectionMetadata = sectionMetadataList[0];
   if (initialSectionMetadata?.numbering?.format) {
     activeNumberFormat = initialSectionMetadata.numbering.format;
@@ -1241,11 +1264,10 @@ export function layoutDocument(blocks: FlowBlock[], measures: Measure[], options
         // Get section metadata for titlePg setting
         const sectionMetadata = sectionMetadataList[activeSectionIndex];
         const titlePgEnabled = sectionMetadata?.titlePg ?? false;
-        // TODO: Support alternateHeaders (odd/even) when needed
-        const alternateHeaders = false;
+        const alternateHeaders = options.oddEvenHeadersFooters === true;
 
         // Determine which header/footer variant applies to this page
-        const variantType = getVariantTypeForPage(sectionPageNumber, titlePgEnabled, alternateHeaders);
+        const variantType = getVariantTypeForPage(newPageNumber, sectionPageNumber, titlePgEnabled, alternateHeaders);
 
         // Resolve header/footer refs for margin calculation using OOXML inheritance model.
         // This must match the rendering logic in PresentationEditor to ensure margins
@@ -1259,22 +1281,20 @@ export function layoutDocument(blocks: FlowBlock[], measures: Measure[], options
         let footerRef = activeSectionRefs?.footerRefs?.[variantType];
         let effectiveVariantType = variantType;
 
-        // Step 2: Inherit from previous section if variant not found
+        // Step 2: Inherit from nearest previous section that defines this variant (transitive)
         if (!headerRef && variantType !== 'default' && activeSectionIndex > 0) {
-          const prevSectionMetadata = sectionMetadataList[activeSectionIndex - 1];
-          if (prevSectionMetadata?.headerRefs?.[variantType]) {
-            headerRef = prevSectionMetadata.headerRefs[variantType];
+          headerRef = findInheritedHeaderFooterRef(variantType, activeSectionIndex, 'header');
+          if (headerRef) {
             layoutLog(
-              `[Layout] Page ${newPageNumber}: Inheriting header '${variantType}' from section ${activeSectionIndex - 1}: ${headerRef}`,
+              `[Layout] Page ${newPageNumber}: Inheriting header '${variantType}' from an earlier section: ${headerRef}`,
             );
           }
         }
         if (!footerRef && variantType !== 'default' && activeSectionIndex > 0) {
-          const prevSectionMetadata = sectionMetadataList[activeSectionIndex - 1];
-          if (prevSectionMetadata?.footerRefs?.[variantType]) {
-            footerRef = prevSectionMetadata.footerRefs[variantType];
+          footerRef = findInheritedHeaderFooterRef(variantType, activeSectionIndex, 'footer');
+          if (footerRef) {
             layoutLog(
-              `[Layout] Page ${newPageNumber}: Inheriting footer '${variantType}' from section ${activeSectionIndex - 1}: ${footerRef}`,
+              `[Layout] Page ${newPageNumber}: Inheriting footer '${variantType}' from an earlier section: ${footerRef}`,
             );
           }
         }

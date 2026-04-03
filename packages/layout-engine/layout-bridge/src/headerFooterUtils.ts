@@ -285,6 +285,32 @@ export function buildMultiSectionIdentifier(
     identifier.footerIds.odd = identifier.footerIds.odd ?? converterIds.footerIds.odd ?? null;
   }
 
+  // PM section metadata often lists only headerReference types present in that sectPr snapshot;
+  // converter.headerIds still has even/odd from the full package. Merge those into per-section
+  // rows so getHeaderFooterTypeForSection sees hasEven and returns 'even' on even pages.
+  if (converterIds?.headerIds) {
+    const c = converterIds.headerIds;
+    for (const [idx, row] of identifier.sectionHeaderIds) {
+      identifier.sectionHeaderIds.set(idx, {
+        default: row.default ?? c.default ?? null,
+        first: row.first ?? c.first ?? null,
+        even: row.even ?? c.even ?? null,
+        odd: row.odd ?? c.odd ?? null,
+      });
+    }
+  }
+  if (converterIds?.footerIds) {
+    const c = converterIds.footerIds;
+    for (const [idx, row] of identifier.sectionFooterIds) {
+      identifier.sectionFooterIds.set(idx, {
+        default: row.default ?? c.default ?? null,
+        first: row.first ?? c.first ?? null,
+        even: row.even ?? c.even ?? null,
+        odd: row.odd ?? c.odd ?? null,
+      });
+    }
+  }
+
   return identifier;
 }
 

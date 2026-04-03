@@ -1614,6 +1614,10 @@ export class HeaderFooterSessionManager {
       let sectionRId: string | undefined;
       if (page?.sectionRefs && kind === 'header') {
         sectionRId = page.sectionRefs.headerRefs?.[headerFooterType as keyof typeof page.sectionRefs.headerRefs];
+        if (!sectionRId && headerFooterType && multiSectionId) {
+          const row = multiSectionId.sectionHeaderIds.get(sectionIndex);
+          sectionRId = row?.[headerFooterType] ?? multiSectionId.headerIds[headerFooterType] ?? undefined;
+        }
         if (!sectionRId && headerFooterType && headerFooterType !== 'default' && sectionIndex > 0 && multiSectionId) {
           const prevSectionIds = multiSectionId.sectionHeaderIds.get(sectionIndex - 1);
           sectionRId = prevSectionIds?.[headerFooterType as keyof typeof prevSectionIds] ?? undefined;
@@ -1623,6 +1627,10 @@ export class HeaderFooterSessionManager {
         }
       } else if (page?.sectionRefs && kind === 'footer') {
         sectionRId = page.sectionRefs.footerRefs?.[headerFooterType as keyof typeof page.sectionRefs.footerRefs];
+        if (!sectionRId && headerFooterType && multiSectionId) {
+          const row = multiSectionId.sectionFooterIds.get(sectionIndex);
+          sectionRId = row?.[headerFooterType] ?? multiSectionId.footerIds[headerFooterType] ?? undefined;
+        }
         if (!sectionRId && headerFooterType && headerFooterType !== 'default' && sectionIndex > 0 && multiSectionId) {
           const prevSectionIds = multiSectionId.sectionFooterIds.get(sectionIndex - 1);
           sectionRId = prevSectionIds?.[headerFooterType as keyof typeof prevSectionIds] ?? undefined;
