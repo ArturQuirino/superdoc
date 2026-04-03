@@ -154,4 +154,75 @@ describe('layoutPerRIdHeaderFooters', () => {
     expect(deps.headerLayoutsByRId.has('rId-header-first-shared::s0')).toBe(true);
     expect(deps.headerLayoutsByRId.has('rId-header-first-shared::s1')).toBe(true);
   });
+
+  it('lays out even/odd header refs inherited from earlier sections', async () => {
+    const deps = {
+      headerLayoutsByRId: new Map(),
+      footerLayoutsByRId: new Map(),
+    };
+
+    const layout: Layout = {
+      pageSize: { w: 612, h: 792 },
+      pages: [
+        { number: 1, fragments: [], sectionIndex: 0 },
+        { number: 2, fragments: [], sectionIndex: 0 },
+        { number: 3, fragments: [], sectionIndex: 1 },
+      ],
+    };
+
+    const sectionMetadata: SectionMetadata[] = [
+      {
+        sectionIndex: 0,
+        pageSize: { w: 612, h: 792 },
+        margins: { top: 72, right: 72, bottom: 72, left: 72, header: 36 },
+        headerRefs: {
+          default: 'rId-default',
+          even: 'rId-even',
+          odd: 'rId-odd',
+        },
+      },
+      {
+        sectionIndex: 1,
+        pageSize: { w: 612, h: 792 },
+        margins: { top: 72, right: 72, bottom: 72, left: 72, header: 36 },
+        headerRefs: {
+          default: 'rId-default-s1',
+          // even and odd NOT defined — should be inherited from section 0
+        },
+      },
+    ];
+
+    await layoutPerRIdHeaderFooters(
+      {
+        headerBlocksByRId: new Map([
+          ['rId-default', [makeParagraph('h-default', 'Default')]],
+          ['rId-even', [makeParagraph('h-even', 'Even header')]],
+          ['rId-odd', [makeParagraph('h-odd', 'Odd header')]],
+          ['rId-default-s1', [makeParagraph('h-default-s1', 'Section 1 default')]],
+        ]),
+        footerBlocksByRId: new Map(),
+        constraints: {
+          width: 468,
+          height: 648,
+          pageWidth: 612,
+          pageHeight: 792,
+          margins: { left: 72, right: 72, top: 72, bottom: 72, header: 36 },
+          overflowBaseHeight: 36,
+        },
+      },
+      layout,
+      sectionMetadata,
+      deps,
+    );
+
+    // Section 0 should have default, even, and odd layouts
+    expect(deps.headerLayoutsByRId.has('rId-default::s0')).toBe(true);
+    expect(deps.headerLayoutsByRId.has('rId-even::s0')).toBe(true);
+    expect(deps.headerLayoutsByRId.has('rId-odd::s0')).toBe(true);
+
+    // Section 1 should have its own default, plus inherited even and odd from section 0
+    expect(deps.headerLayoutsByRId.has('rId-default-s1::s1')).toBe(true);
+    expect(deps.headerLayoutsByRId.has('rId-even::s1')).toBe(true);
+    expect(deps.headerLayoutsByRId.has('rId-odd::s1')).toBe(true);
+  });
 });

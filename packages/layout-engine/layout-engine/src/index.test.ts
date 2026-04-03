@@ -826,6 +826,92 @@ describe('layoutDocument', () => {
     expect(section2Page!.margins.top).toBeGreaterThanOrEqual(72 + tallFirst - 1);
   });
 
+  it('uses physical page number for even/odd variant selection when oddEvenHeadersFooters is enabled', () => {
+    const m = { top: 72, bottom: 72, left: 72, right: 72, header: 36, footer: 36 };
+
+    // Single section with alternateHeaders. Odd physical pages get 'odd' variant,
+    // even physical pages get 'even' variant. Each variant has a different header
+    // height so we can verify the correct one drives margin inflation.
+    const sb0: FlowBlock = {
+      kind: 'sectionBreak',
+      id: 'sb-0',
+      type: 'continuous',
+      margins: m,
+      headerRefs: { default: 'd0', even: 'e0', odd: 'o0' },
+      attrs: { isFirstSection: true, sectionIndex: 0 },
+    };
+
+    const lineHeight = 20;
+    const blocks: FlowBlock[] = [sb0, { kind: 'paragraph', id: 'p0', runs: [] }];
+    const measures: Measure[] = [
+      { kind: 'sectionBreak' },
+      makeMeasure(Array(80).fill(lineHeight)), // enough content for multiple pages
+    ];
+
+    const evenHeight = 120;
+    const oddHeight = 80;
+    const sectionMetadata: SectionMetadata[] = [
+      { sectionIndex: 0, headerRefs: { default: 'd0', even: 'e0', odd: 'o0' } },
+    ];
+
+    const layout = layoutDocument(blocks, measures, {
+      pageSize: { w: 612, h: 792 },
+      margins: m,
+      sectionMetadata,
+      oddEvenHeadersFooters: true,
+      headerContentHeightsByRId: new Map([
+        ['e0', evenHeight],
+        ['o0', oddHeight],
+      ]),
+    });
+
+    expect(layout.pages.length).toBeGreaterThanOrEqual(2);
+
+    // Page 1 (physical 1, odd): odd variant → margin inflated by oddHeight
+    const page1 = layout.pages[0];
+    expect(page1.margins.top).toBeGreaterThanOrEqual(36 + oddHeight - 1);
+
+    // Page 2 (physical 2, even): even variant → margin inflated by evenHeight
+    const page2 = layout.pages[1];
+    expect(page2.margins.top).toBeGreaterThanOrEqual(36 + evenHeight - 1);
+    // Even margin should be larger than odd margin since evenHeight > oddHeight
+    expect(page2.margins.top).toBeGreaterThan(page1.margins.top);
+  });
+
+  it('does not use even/odd variants when oddEvenHeadersFooters is not set', () => {
+    const m = { top: 72, bottom: 72, left: 72, right: 72, header: 36, footer: 36 };
+    const sb0: FlowBlock = {
+      kind: 'sectionBreak',
+      id: 'sb-0',
+      type: 'continuous',
+      margins: m,
+      headerRefs: { default: 'd0', even: 'e0' },
+      attrs: { isFirstSection: true, sectionIndex: 0 },
+    };
+
+    const lineHeight = 20;
+    const blocks: FlowBlock[] = [sb0, { kind: 'paragraph', id: 'p0', runs: [] }];
+    const measures: Measure[] = [{ kind: 'sectionBreak' }, makeMeasure(Array(80).fill(lineHeight))];
+
+    const tallEven = 200;
+    const layout = layoutDocument(blocks, measures, {
+      pageSize: { w: 612, h: 792 },
+      margins: m,
+      sectionMetadata: [{ sectionIndex: 0, headerRefs: { default: 'd0', even: 'e0' } }],
+      // oddEvenHeadersFooters NOT set
+      headerContentHeightsByRId: new Map([
+        ['e0', tallEven],
+        ['d0', 10],
+      ]),
+    });
+
+    // Without oddEvenHeadersFooters, all pages use 'default' variant —
+    // margins should NOT be inflated by the even header height
+    for (const page of layout.pages) {
+      expect(page.margins.top).toBeLessThan(36 + tallEven);
+    }
+  });
+
   it('applies section break margins to subsequent pages', () => {
     const sectionBreakBlock: FlowBlock = {
       kind: 'sectionBreak',
