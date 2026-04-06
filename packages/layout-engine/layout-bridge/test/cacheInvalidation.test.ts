@@ -133,13 +133,19 @@ describe('Cache Invalidation', () => {
           width: 500,
           height: 100,
           pageWidth: 600,
-          margins: { left: 50, right: 50 },
+          pageHeight: 800,
+          margins: { left: 50, right: 50, top: 40, bottom: 60, header: 30, footer: 20 },
         };
 
         const hash = computeConstraintsHash(constraints);
         expect(hash).toContain('pw:600');
+        expect(hash).toContain('ph:800');
         expect(hash).toContain('ml:50');
         expect(hash).toContain('mr:50');
+        expect(hash).toContain('mt:40');
+        expect(hash).toContain('mb:60');
+        expect(hash).toContain('mh:30');
+        expect(hash).toContain('mf:20');
       });
 
       it('should produce different hashes for different constraints', () => {
