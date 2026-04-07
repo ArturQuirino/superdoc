@@ -35,7 +35,7 @@ export function importCommentData({ docx, editor, converter }) {
     const { attributes } = el;
     const importedId = attributes['w:id'];
     const authorName = attributes['w:author'];
-    const authorEmail = attributes['w:email'];
+    const authorEmail = attributes['w:email'] ?? attributes['custom:authorEmail'];
     const initials = attributes['w:initials'];
     const createdDate = attributes['w:date'];
     const internalId = attributes['custom:internalId'];
