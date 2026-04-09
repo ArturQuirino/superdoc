@@ -730,7 +730,7 @@ const init = async () => {
         // },
         // fonts: null,
         // hideButtons: false,
-        // responsiveToContainer: true,
+        responsiveToContainer: true,
         excludeItems: [], // ['italic', 'bold'],
         // texts: {},
       },
@@ -853,12 +853,12 @@ const init = async () => {
             },
           }
         : {}),
-      ai: {
-        // Provide your Harbour API key here for direct endpoint access
-        // apiKey: 'test',
-        // Optional: Provide a custom endpoint for AI services
-        // endpoint: 'https://sd-dev-express-gateway-i6xtm.ondigitalocean.app/insights',
-      },
+      // ai: {
+      // Provide your Harbour API key here for direct endpoint access
+      // apiKey: 'test',
+      // Optional: Provide a custom endpoint for AI services
+      // endpoint: 'https://sd-dev-express-gateway-i6xtm.ondigitalocean.app/insights',
+      // },
       pdf: {
         pdfLib: pdfjsLib,
         setWorker: false,

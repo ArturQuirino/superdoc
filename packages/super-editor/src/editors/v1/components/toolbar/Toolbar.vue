@@ -14,6 +14,7 @@ const { proxy } = getCurrentInstance();
 const emit = defineEmits(['command', 'toggle', 'select']);
 
 let toolbarKey = ref(1);
+const compactSideGroups = ref(false);
 
 /**
  * Computed property that determines the font-family to use for toolbar UI surfaces.
@@ -40,9 +41,14 @@ const getFilteredItems = (position) => {
   return proxy.$toolbar.getToolbarItemByGroup(position).filter((item) => !excludeButtonsList.includes(item.name.value));
 };
 
+const updateCompactSideGroups = () => {
+  compactSideGroups.value = (proxy.$toolbar.toolbarContainer?.offsetWidth ?? 0) <= 1280;
+};
+
 onMounted(() => {
   window.addEventListener('resize', onResizeThrottled);
   window.addEventListener('keydown', onKeyDown);
+  updateCompactSideGroups();
 });
 
 onDeactivated(() => {
@@ -66,6 +72,7 @@ const onKeyDown = async (e) => {
 
 const onWindowResized = async () => {
   await proxy.$toolbar.onToolbarResize();
+  updateCompactSideGroups();
   toolbarKey.value += 1;
 };
 const onResizeThrottled = throttle(onWindowResized, 300);
@@ -107,6 +114,7 @@ const handleToolbarMousedown = (e) => {
       tabindex="0"
       v-if="showLeftSide"
       :toolbar-items="getFilteredItems('left')"
+      :compact-side-groups="compactSideGroups"
       :ui-font-family="uiFontFamily"
       position="left"
       @command="handleCommand"
@@ -117,6 +125,7 @@ const handleToolbarMousedown = (e) => {
       tabindex="0"
       :toolbar-items="getFilteredItems('center')"
       :overflow-items="proxy.$toolbar.overflowItems"
+      :compact-side-groups="compactSideGroups"
       :ui-font-family="uiFontFamily"
       position="center"
       @command="handleCommand"
@@ -126,6 +135,7 @@ const handleToolbarMousedown = (e) => {
       tabindex="0"
       v-if="showRightSide"
       :toolbar-items="getFilteredItems('right')"
+      :compact-side-groups="compactSideGroups"
       :ui-font-family="uiFontFamily"
       position="right"
       @command="handleCommand"
@@ -146,12 +156,6 @@ const handleToolbarMousedown = (e) => {
   font-family: var(--sd-ui-font-family, Arial, Helvetica, sans-serif);
   position: relative;
   z-index: var(--sd-ui-toolbar-z-index, 10);
-}
-
-@media (max-width: 1280px) {
-  .superdoc-toolbar-group-side {
-    min-width: auto !important;
-  }
 }
 
 @media (max-width: 768px) {

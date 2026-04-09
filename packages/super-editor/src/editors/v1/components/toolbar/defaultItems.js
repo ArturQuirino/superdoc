@@ -1043,18 +1043,38 @@ export const makeDefaultItems = ({
     }),
   });
 
-  // Responsive toolbar calculations
-  const breakpoints = {
+  // Responsive toolbar calculations.
+  // `availableWidth` comes from SuperToolbar and represents either:
+  // - container width when `responsiveToContainer: true`
+  // - viewport/document width when `responsiveToContainer: false`
+  const RESPONSIVE_BREAKPOINTS = {
     sm: 768,
     md: 1024,
     lg: 1280,
     xl: 1410,
   };
+  const XL_OVERFLOW_SAFETY_BUFFER = 20;
   const stickyItemsWidth = 120;
   const toolbarPadding = 32;
 
   const itemsToHideXL = ['linkedStyles', 'clearFormatting', 'copyFormat', 'ruler'];
   const itemsToHideSM = ['zoom', 'fontFamily', 'fontSize', 'redo'];
+  const shouldCompactDocumentMode = availableWidth <= RESPONSIVE_BREAKPOINTS.lg;
+  const shouldCompactLinkedStyles = availableWidth <= RESPONSIVE_BREAKPOINTS.lg;
+
+  if (shouldCompactDocumentMode) {
+    documentMode.attributes.value = {
+      ...documentMode.attributes.value,
+      className: `${documentMode.attributes.value.className} toolbar-item--doc-mode-compact`,
+    };
+  }
+
+  if (shouldCompactLinkedStyles) {
+    linkedStyles.attributes.value = {
+      ...linkedStyles.attributes.value,
+      className: `${linkedStyles.attributes.value.className} toolbar-item--linked-styles-compact`,
+    };
+  }
 
   let toolbarItems = [
     undo,
@@ -1106,7 +1126,7 @@ export const makeDefaultItems = ({
   }
 
   // Hide separators on small screens
-  if (availableWidth <= breakpoints.md && hideButtons) {
+  if (availableWidth <= RESPONSIVE_BREAKPOINTS.md && hideButtons) {
     toolbarItems = toolbarItems.filter((item) => item.type !== 'separator');
   }
 
@@ -1141,7 +1161,11 @@ export const makeDefaultItems = ({
   toolbarItems.forEach((item) => {
     const itemWidth = controlSizes.get(item.name.value) || controlSizes.get('default');
 
-    if (availableWidth < breakpoints.xl && itemsToHideXL.includes(item.name.value) && hideButtons) {
+    if (
+      availableWidth <= RESPONSIVE_BREAKPOINTS.xl + XL_OVERFLOW_SAFETY_BUFFER &&
+      itemsToHideXL.includes(item.name.value) &&
+      hideButtons
+    ) {
       overflowItems.push(item);
       if (item.name.value === 'linkedStyles') {
         const linkedStylesIdx = toolbarItems.findIndex((item) => item.name.value === 'linkedStyles');
@@ -1150,7 +1174,7 @@ export const makeDefaultItems = ({
       return;
     }
 
-    if (availableWidth < breakpoints.sm && itemsToHideSM.includes(item.name.value) && hideButtons) {
+    if (availableWidth < RESPONSIVE_BREAKPOINTS.sm && itemsToHideSM.includes(item.name.value) && hideButtons) {
       overflowItems.push(item);
       return;
     }
